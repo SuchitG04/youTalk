@@ -12,6 +12,7 @@ import { RiResetLeftFill } from "react-icons/ri";
 import { v4 as uuidv4 } from "uuid";
 
 import { downloadAndProcessVideo } from "@/app/actions/videoProc";
+import { saveAudio } from "@/app/actions/saveAudio";
 
 const Spinner = () => (
   <svg className='animate-spin h-5 w-5 mr-3' viewBox='0 0 24 24'>
@@ -34,6 +35,7 @@ export default function Home() {
   const [isAudioProcessing, setIsAudioProcessing] = useState(false);
   const [isUrlProcessing, setIsUrlProcessing] = useState<boolean | 'success' | 'removed'>(false);
   const [ytAudioPath, setYtAudioPath] = useState("");
+  const [userAudioPath, setUserAudioPath] = useState("");
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
 
@@ -52,26 +54,34 @@ export default function Home() {
       mediaRecorder.current.ondataavailable = (e) => {
         audioChunks.current.push(e.data)
       };
-
-      mediaRecorder.current.onstop = async () => {
-        setIsAudioProcessing(true);
-        const audioBlob = new Blob(audioChunks.current);
-        audioChunks.current = [];
-
-        const audioFile = new File([audioBlob], `${uuidv4()}.mp3`, { type: 'audio/mp3' });
-        // placeholder timeout to mimic processing
-        setTimeout(() => setIsAudioProcessing(false), 2000);
-      };
     } catch (err) {
       setAudioError('Microphone access required for recording')
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (mediaRecorder.current) {
       mediaRecorder.current.stop();
+      setIsAudioProcessing(true);
+
+      // Wait for final data to arrive
+      await new Promise(resolve => {
+        mediaRecorder.current!.onstop = resolve;
+      });
+
+      const audioBlob = new Blob(audioChunks.current);
+      const audioPath = uuidv4();
+      setUserAudioPath(audioPath);
+      await saveAudio(audioBlob, audioPath);
+
+      // placeholder timeout to mimic processing
+      setTimeout(() => setIsAudioProcessing(false), 2000);
+
       // use ytAudioPath to generate voice clone + this and user audio to gemini parallelly
       // or should you generate the voice clone right after we get the audio from the downloaded video?
+
+      audioChunks.current = [];
+      mediaRecorder.current.stream.getTracks().forEach(track => track.stop());
       setIsRecording(false);
     }
   };
