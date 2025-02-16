@@ -61,7 +61,7 @@ export async function downloadAndProcessVideo(youtubeUrl: string): Promise<strin
               console.error('Error deleting the video file:', err);
             }
           });
-          resolve(audioPath);
+          resolve(audioPath.split('/')[2]);
         })
         .save(audioPath);
     });

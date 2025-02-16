@@ -22,7 +22,7 @@ export default function Home() {
     userAudioPath,
     startRecording,
     stopRecording
-  } = useAudioRecorder();
+  } = useAudioRecorder(ytAudioPath); // ytAudioPath is passed in the api call inside useAudioRecorder
 
 
   return (
