@@ -33,4 +33,17 @@ export async function POST(req: Request) {
   return new Response(JSON.stringify({ audio_base64: audio.audio_base64 }), {
     status: 200,
   });
+
+  // Code to test
+  // const fs = require('fs');
+  // const path = require('path');
+  
+  // const audioFilePath = path.join('/home/suchitg/youTalk/you-talk/user_audios/9c30bf5e-117d-40c8-a3d2-8af382166366.mp3');
+  // const audioData = fs.readFileSync(audioFilePath);
+  // const base64Audio = audioData.toString('base64');
+
+
+  // return new Response(JSON.stringify({ audio_base64: base64Audio }), {
+  //   status: 200,
+  // });
 }

@@ -7,8 +7,12 @@ export function useAudioRecorder(ytAudioPath: string) {
   const [isAudioProcessing, setIsAudioProcessing] = useState(false);
   const [audioError, setAudioError] = useState("");
   const [userAudioPath, setUserAudioPath] = useState("");
+  const [volume, setVolume] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number>(null);
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ audio: true })
@@ -105,10 +109,37 @@ export function useAudioRecorder(ytAudioPath: string) {
       const audioUrl = URL.createObjectURL(new Blob([audioBuffer]));
       const audio = new Audio(audioUrl);
       audio.play();
+      
+      // Setup audio analysis
+      audioContextRef.current = new AudioContext();
+      const source = audioContextRef.current.createMediaElementSource(audio);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      
+      source.connect(analyserRef.current);
+      analyserRef.current.connect(audioContextRef.current.destination);
+      updateVolume();
 
       setIsAudioProcessing(false);
     }
 
+  };
+
+  const updateVolume = () => {
+    if (!analyserRef.current) return;
+    
+    const dataArray = new Uint8Array(analyserRef.current.fftSize);
+    analyserRef.current.getByteTimeDomainData(dataArray);
+    
+    let sum = 0;
+    for (const amplitude of dataArray) {
+      sum += Math.abs(128 - amplitude);
+    }
+    const avg = sum / dataArray.length;
+    setVolume(Math.min(avg / 50, 1)); // Normalize volume 0-1
+    
+    // update volume at 60Hz
+    animationFrameRef.current = requestAnimationFrame(updateVolume);
   };
 
   return {
@@ -116,6 +147,7 @@ export function useAudioRecorder(ytAudioPath: string) {
     isAudioProcessing,
     audioError,
     userAudioPath,
+    volume,
     startRecording,
     stopRecording
   };

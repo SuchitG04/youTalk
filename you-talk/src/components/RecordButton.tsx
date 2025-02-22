@@ -6,6 +6,7 @@ interface RecordButtonProps {
   isUrlProcessing: boolean | 'success' | 'removed';
   onStartRecording: () => void;
   onStopRecording: () => void;
+  volume?: number;
 }
 
 export function RecordButton({
@@ -13,7 +14,8 @@ export function RecordButton({
   isAudioProcessing,
   isUrlProcessing,
   onStartRecording,
-  onStopRecording
+  onStopRecording,
+  volume = 0
 }: RecordButtonProps) {
   return (
     <div className="flex flex-col items-center justify-center space-y-4">
@@ -22,6 +24,10 @@ export function RecordButton({
         onMouseUp={onStopRecording}
         onTouchStart={onStartRecording}
         onTouchEnd={onStopRecording}
+        style={{
+          transform: `scale(${1 + volume * 0.2})`,
+          transition: 'transform 0.1s ease-out'
+        }}
         className={`p-6 rounded-full transition-all duration-300 ${
           isRecording 
             ? 'bg-red-500 scale-110' 

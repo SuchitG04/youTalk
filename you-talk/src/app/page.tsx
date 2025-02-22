@@ -21,7 +21,8 @@ export default function Home() {
     audioError,
     userAudioPath,
     startRecording,
-    stopRecording
+    stopRecording,
+    volume
   } = useAudioRecorder(ytAudioPath); // ytAudioPath is passed in the api call inside useAudioRecorder
 
 
@@ -84,6 +85,7 @@ export default function Home() {
                   isUrlProcessing={isUrlProcessing}
                   onStartRecording={startRecording}
                   onStopRecording={stopRecording}
+                  volume={volume}
                 />
 
                 {audioError && (
