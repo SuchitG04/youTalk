@@ -10,6 +10,7 @@ import { RiResetLeftFill } from "react-icons/ri";
 import { RecordButton } from "@/components/RecordButton";
 import { UrlForm } from "@/components/UrlForm";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { useChat } from "@/hooks/useChat";
 
 export default function Home() {
   const [ytAudioPath, setYtAudioPath] = useState("");
@@ -19,11 +20,10 @@ export default function Home() {
     isRecording,
     isAudioProcessing,
     audioError,
-    userAudioPath,
     startRecording,
-    stopRecording,
+    startChat,
     volume
-  } = useAudioRecorder(ytAudioPath); // ytAudioPath is passed in the api call inside useAudioRecorder
+  } = useChat(ytAudioPath); // ytAudioPath is passed in the api call inside useAudioRecorder
 
 
   return (
@@ -84,7 +84,7 @@ export default function Home() {
                   isAudioProcessing={isAudioProcessing}
                   isUrlProcessing={isUrlProcessing}
                   onStartRecording={startRecording}
-                  onStopRecording={stopRecording}
+                  onRecordingEnd={startChat}
                   volume={volume}
                 />
 

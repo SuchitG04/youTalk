@@ -1,3 +1,0 @@
-- user submits a youtube URL. we validate it and if it is valid, we send it to the backend logic
-- extract audio from the yt vid to generate voice clone + context to gemini (https://elevenlabs.io/docs/api-reference/voices/add)
-- on finishing recording user audio, send that + context to gemini and get text response

@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   // const fs = require('fs');
   // const path = require('path');
   
-  // const audioFilePath = path.join('/home/suchitg/youTalk/you-talk/user_audios/9c30bf5e-117d-40c8-a3d2-8af382166366.mp3');
+  // const audioFilePath = path.join('/home/suchitg/youTalk/you-talk/audios/9c30bf5e-117d-40c8-a3d2-8af382166366.mp3');
   // const audioData = fs.readFileSync(audioFilePath);
   // const base64Audio = audioData.toString('base64');
 
