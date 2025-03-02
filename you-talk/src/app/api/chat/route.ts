@@ -1,6 +1,25 @@
 import { readFileSync } from "node:fs";;
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ChatMessage } from "@/store/chatStore";
+import { ElevenLabsClient } from "elevenlabs";
+
+
+interface AudioResponse {
+  audio_base64: string;
+  alignment: {
+    characters: [string];
+    character_start_times_seconds: [number];
+    character_end_times_seconds: [number];
+  };
+  normalized_alignment: {
+    characters: [string];
+    character_start_times_seconds: [number];
+    character_end_times_seconds: [number];
+  };
+}
+
+
+const client = new ElevenLabsClient({apiKey: process.env.ELEVENLABS_API_KEY});
 
 if (!process.env.GOOGLE_API_KEY) {
   throw new Error("GOOGLE_API_KEY is not defined");
@@ -68,7 +87,13 @@ export async function POST(req: Request) {
 
     console.log(result.response.text());
 
-    return new Response(JSON.stringify({ message: result.response.text() }), {
+    const audio: AudioResponse = await client.textToSpeech.convertWithTimestamps("JBFqnCBsd6RMkjVDRZzb", {
+      text: result.response.text(),
+      model_id: "eleven_flash_v2_5",
+      output_format: "mp3_44100_128",
+    });
+
+    return new Response(JSON.stringify({ text_message: result.response.text(), audio_base64: audio.audio_base64 }), {
       status: 200,
     });
 }

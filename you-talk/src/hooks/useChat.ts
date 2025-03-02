@@ -10,6 +10,12 @@ interface ChatMessage {
   audioPath?: string;
 }
 
+interface VoiceResponse {
+  text_message: string;
+  audio_base64: string;
+}
+
+
 export function useChat(ytAudioPath: string) {
   const [audioError, setAudioError] = useState("");
   const [isAudioProcessing, setIsAudioProcessing] = useState(false);
@@ -29,7 +35,7 @@ export function useChat(ytAudioPath: string) {
   };
 
   // call /api/chat with the user's audioPath and ytAudioPath
-  const askGemini = async (recordedAudioPath: string): Promise<string> => {
+  const getVoiceResponse = async (recordedAudioPath: string): Promise<VoiceResponse> => {
     const convHistory = useChatStore.getState().convHistory;
 
     try {
@@ -46,7 +52,7 @@ export function useChat(ytAudioPath: string) {
       }
 
       const data = await response.json();
-      return data.message;
+      return data;
     } catch (err) {
       const errorMsg = 'Failed to get response from Gemini';
       handleApiError(errorMsg);
@@ -54,28 +60,6 @@ export function useChat(ytAudioPath: string) {
     }
   };
 
-  const elevenLabsTTS = async (text: string): Promise<string> => {
-    try {
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.audio_base64;
-    } catch (err) {
-      const errorMsg = 'Failed to generate speech with ElevenLabs';
-      handleApiError(errorMsg);
-      throw err;
-    }
-  };
 
   const getAiResponse = async (): Promise<[string, string]> => {
     const currentAudioPath = useAudioStore.getState().userAudioPath;
@@ -83,11 +67,9 @@ export function useChat(ytAudioPath: string) {
       throw new Error('No audio recording available');
     }
 
-    // TODO: send conversation history to Gemini
-    const geminiResponse = await askGemini(currentAudioPath);
-    const ttsResponse = await elevenLabsTTS(geminiResponse);
+    const aiResponse: VoiceResponse = await getVoiceResponse(currentAudioPath);
   
-    return [geminiResponse, ttsResponse];
+    return [aiResponse.text_message, aiResponse.audio_base64];
   };
 
   const startChat = async () => {
