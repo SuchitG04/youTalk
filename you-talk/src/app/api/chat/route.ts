@@ -18,13 +18,15 @@ interface AudioResponse {
   };
 }
 
-
-const client = new ElevenLabsClient({apiKey: process.env.ELEVENLABS_API_KEY});
-
 if (!process.env.GOOGLE_API_KEY) {
   throw new Error("GOOGLE_API_KEY is not defined");
 }
+if (!process.env.ELEVENLABS_API_KEY) {
+  throw new Error("ELEVENLABS_API_KEY is not defined");
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+const client = new ElevenLabsClient({apiKey: process.env.ELEVENLABS_API_KEY});
 
 export async function POST(req: Request) {
     const { recordedAudioPath, ytAudioPath, convHistory }:
