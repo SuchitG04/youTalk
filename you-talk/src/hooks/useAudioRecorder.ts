@@ -8,12 +8,8 @@ export function useAudioRecorder(ytAudioPath: string) {
   const [isAudioProcessing, setIsAudioProcessing] = useState(false);
   // audioError is shown under the mic icon in the UI
   const [audioError, setAudioError] = useState("");
-  const [volume, setVolume] = useState(0);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const audioChunks = useRef<Blob[]>([]);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationFrameRef = useRef<number>(null);
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ audio: true })
@@ -21,6 +17,7 @@ export function useAudioRecorder(ytAudioPath: string) {
 
   const startRecording = async () => {
     try {
+      audioChunks.current = []; // Reset audio chunks at the start of recording
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaRecorder.current = new MediaRecorder(stream);
       mediaRecorder.current.start();
@@ -44,52 +41,19 @@ export function useAudioRecorder(ytAudioPath: string) {
         mediaRecorder.current!.onstop = resolve;
       });
 
+      console.log("stopped recording");
       const audioBlob = new Blob(audioChunks.current);
       const audioPath = `${uuidv4()}.mp3`;      
 
       try {
         await saveAudio(audioBlob, audioPath);
         useAudioStore.getState().setUserAudioPath(audioPath);
+        audioChunks.current = []; // Clear the chunks after successful save
       } catch (error) {
         console.error('Failed to save audio.');
-        throw error; // Re-throw to handle in the calling code
+        throw error; 
       }
     }
-  };
-
-  const playAudio = (audioBase64: string) => {
-    // play audio from base64 string
-    const audioBuffer = Buffer.from(audioBase64, 'base64');
-    const audioUrl = URL.createObjectURL(new Blob([audioBuffer]));
-    const audio = new Audio(audioUrl);
-    audio.play();
-    
-    // Setup audio analysis
-    audioContextRef.current = new AudioContext();
-    const source = audioContextRef.current.createMediaElementSource(audio);
-    analyserRef.current = audioContextRef.current.createAnalyser();
-    analyserRef.current.fftSize = 256;
-    
-    source.connect(analyserRef.current);
-    analyserRef.current.connect(audioContextRef.current.destination);
-    updateVolume();
-  }
-
-  const updateVolume = () => {
-    if (!analyserRef.current) return;
-    
-    const dataArray = new Uint8Array(analyserRef.current.fftSize);
-    analyserRef.current.getByteTimeDomainData(dataArray);
-    
-    let sum = 0;
-    for (const amplitude of dataArray) {
-      sum += Math.abs(128 - amplitude);
-    }
-    const avg = sum / dataArray.length;
-    setVolume(Math.min(avg / 50, 1)); // Normalize volume 0-1
-    
-    // update volume at 60Hz
-    animationFrameRef.current = requestAnimationFrame(updateVolume);
   };
 
   return {
@@ -97,9 +61,7 @@ export function useAudioRecorder(ytAudioPath: string) {
     isAudioProcessing,
     audioError,
     setAudioError,
-    volume,
     startRecording,
     stopRecording,
-    playAudio
   };
 }

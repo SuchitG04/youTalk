@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState, useRef } from "react";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAudioStore, useChatStore } from "@/store/chatStore";
-import { saveAudio } from "@/app/actions/saveAudio";
-import { v4 as uuidv4 } from 'uuid';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -20,18 +18,59 @@ export function useChat(ytAudioPath: string) {
   const [audioError, setAudioError] = useState("");
   const [isAudioProcessing, setIsAudioProcessing] = useState(false);
 
+  const [volume, setVolume] = useState(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number>(null);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+
   const {
     isRecording,
     startRecording,
     stopRecording,
-    volume,
-    playAudio
   } = useAudioRecorder(ytAudioPath); // ytAudioPath is passed in the api call inside useAudioRecorder
 
   const handleApiError = (error: string, duration = 5000) => {
     setAudioError(error);
     setTimeout(() => setAudioError(''), duration);
     console.error(error);
+  };
+
+
+  const playAudio = (audioBase64: string) => {
+    // play audio from base64 string
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+    const audioUrl = URL.createObjectURL(new Blob([audioBuffer]));
+    const audio = new Audio(audioUrl);
+    audio.play();
+    
+    // Setup audio analysis
+    audioContextRef.current = new AudioContext();
+    const source = audioContextRef.current.createMediaElementSource(audio);
+    analyserRef.current = audioContextRef.current.createAnalyser();
+    analyserRef.current.fftSize = 256;
+    
+    source.connect(analyserRef.current);
+    analyserRef.current.connect(audioContextRef.current.destination);
+    updateVolume();
+  }
+
+  const updateVolume = () => {
+    if (!analyserRef.current) return;
+    
+    const dataArray = new Uint8Array(analyserRef.current.fftSize);
+    analyserRef.current.getByteTimeDomainData(dataArray);
+    
+    let sum = 0;
+    for (const amplitude of dataArray) {
+      sum += Math.abs(128 - amplitude);
+    }
+    const avg = sum / dataArray.length;
+    setVolume(Math.min(avg / 50, 1)); // Normalize volume 0-1
+    
+    // update volume at 60Hz
+    animationFrameRef.current = requestAnimationFrame(updateVolume);
   };
 
   // call /api/chat with the user's audioPath and ytAudioPath
@@ -73,6 +112,7 @@ export function useChat(ytAudioPath: string) {
   };
 
   const startChat = async () => {
+    await stopRecording();
     setIsAudioProcessing(true);
 
     if (useChatStore.getState().convHistory.length === 0) {
@@ -80,34 +120,115 @@ export function useChat(ytAudioPath: string) {
       useChatStore.getState().addToConvHistory({
         role: 'user',
         userAudioPath: ytAudioPath
-      });
+      })
     }
 
+    const recordedAudioPath = useAudioStore.getState().userAudioPath;
+    if (!recordedAudioPath) {
+      throw new Error('No audio recording available');
+    }
+    const convHistory = useChatStore.getState().convHistory;
+
     try {
-      await stopRecording();
-      const [responseText, audioBase64] = await getAiResponse();
-      // save ai audio to audios folder
-      const asstAudioPath = `${uuidv4()}.mp3`;
-      const audioBlob = new Blob([Buffer.from(audioBase64, 'base64')]);
-      await saveAudio(audioBlob, asstAudioPath);
+      // Add user message to conversation history
+      // useChatStore.getState().addToConvHistory({
+      //   role: 'user',
+      //   userAudioPath: recordedAudioPath
+      // });
 
-      // update chat history with user and assistant messages
-      useChatStore.getState().addToConvHistory({
-        role: 'user',
-        userAudioPath: useAudioStore.getState().userAudioPath! 
-      });
-      useChatStore.getState().addToConvHistory({
-        role: 'assistant',
-        content: responseText,
-        userAudioPath: asstAudioPath
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Connection': 'keep-alive',
+        },
+        body: JSON.stringify({ recordedAudioPath, ytAudioPath, convHistory }),
       });
 
-      playAudio(audioBase64);
+      if (!response.body) throw new Error("No response body");
+      
+      // Initialize audio context for visualization
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 256;
+      
+      // Start volume visualization
+      setIsPlaying(true);
+      updateVolume();
+      
+      // Create an audio element for playback
+      const audioElement = new Audio();
+      let audioSource: MediaElementAudioSourceNode | null = null;
+      
+      // Store all received chunks
+      const audioChunks: Uint8Array[] = [];
+      
+      // Process the stream
+      const reader = response.body.getReader();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        // Add the new chunk to our collection
+        audioChunks.push(value);
+        
+        // Create a blob from all chunks received so far
+        const blob = new Blob(audioChunks, { type: 'audio/mp3' });
+        const url = URL.createObjectURL(blob);
+        
+        // Remember current playback position if already playing
+        const currentTime = audioElement.currentTime;
+        const wasPlaying = !audioElement.paused && audioElement.currentTime > 0;
+        
+        // Clean up old URL if exists
+        if (audioElement.src && audioElement.src.startsWith('blob:')) {
+          URL.revokeObjectURL(audioElement.src);
+        }
+        
+        // Update the audio source
+        audioElement.src = url;
+        
+        // If we were already playing, restore position and continue
+        if (wasPlaying) {
+          audioElement.currentTime = currentTime;
+          audioElement.play().catch(e => console.error('Error resuming audio:', e));
+        } else {
+          // First time playing, set up analyzer connection
+          audioElement.play()
+            .then(() => {
+              // Connect to analyzer for volume visualization (only once)
+              if (!audioSource) {
+                audioSource = audioContextRef.current!.createMediaElementSource(audioElement);
+                audioSource.connect(analyserRef.current!);
+                analyserRef.current!.connect(audioContextRef.current!.destination);
+                updateVolume();
+              }
+            })
+            .catch(e => console.error('Error starting audio playback:', e));
+        }
+      }
+      
+      // Add assistant's response to conversation history
+      // useChatStore.getState().addToConvHistory({
+      //   role: 'assistant',
+      //   content: 'Audio response played'
+      // });
+
     } catch (err) {
       console.error('Error during chat:', err);
+      handleApiError('Error during chat: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
+      setIsPlaying(false);
       setIsAudioProcessing(false);
       useAudioStore.getState().resetAudioPath();
+      
+      // Clean up audio resources
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     }
   };
 
