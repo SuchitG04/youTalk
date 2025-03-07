@@ -29,14 +29,12 @@ if (!process.env.ELEVENLABS_API_KEY) {
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 const client = new ElevenLabsClient({apiKey: process.env.ELEVENLABS_API_KEY});
 
-const model_id = "eleven_flash_v2_5"
-const voiceId = "Xb7hH8MSUJpSbSDYk0k2"
-const ws_url = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=${model_id}`
 
 export async function POST(req: Request) {
-  const { recordedAudioPath, ytAudioPath, convHistory }:
-    { recordedAudioPath: string, ytAudioPath: string, convHistory: ChatMessage[] } = await req.json();
+  const { recordedAudioPath, ytAudioPath, convHistory, voiceId }:
+    { recordedAudioPath: string, ytAudioPath: string, convHistory: ChatMessage[], voiceId: string } = await req.json();
 
+  const ws_url = `wss://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream-input?model_id=eleven_flash_v2_5`
   // get base64 string of audio file
   console.log(`./audios/${recordedAudioPath}`);
   const base64UserAudioFile = readFileSync(`./audios/${recordedAudioPath}`, 'base64');

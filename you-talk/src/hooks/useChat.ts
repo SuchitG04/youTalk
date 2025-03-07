@@ -24,6 +24,9 @@ export function useChat(ytAudioPath: string) {
   const animationFrameRef = useRef<number>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
+  const [voiceCloneCreated, setVoiceCloneCreated] = useState(false);
+
+  const voiceId = useRef<string | null>(null);
 
   const {
     isRecording,
@@ -115,6 +118,16 @@ export function useChat(ytAudioPath: string) {
     await stopRecording();
     setIsAudioProcessing(true);
 
+    if (!voiceCloneCreated) {
+      const voiceIdResponse = await fetch('/api/voiceClone', {
+        method: 'POST',
+        body: JSON.stringify({ audioPath: ytAudioPath }),
+      });
+      const voiceIdData = await voiceIdResponse.json();
+      voiceId.current = voiceIdData.voiceId;
+      setVoiceCloneCreated(true);
+    }
+
     if (useChatStore.getState().convHistory.length === 0) {
       // add yt audio to be added first
       useChatStore.getState().addToConvHistory({
@@ -142,7 +155,7 @@ export function useChat(ytAudioPath: string) {
           'Content-Type': 'application/json',
           'Connection': 'keep-alive',
         },
-        body: JSON.stringify({ recordedAudioPath, ytAudioPath, convHistory }),
+        body: JSON.stringify({ recordedAudioPath, ytAudioPath, convHistory, voiceId: voiceId.current }),
       });
 
       if (!response.body) throw new Error("No response body");
